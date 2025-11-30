@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文藝復興自拍機 - 優雅相框體驗</title>
+    
+    <!-- 生產環境樣式 - 支援PNG透明畫框 -->
+    <style>
+        /* 重置和基礎樣式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 1rem;
+            color: #1f2937;
+        }
+
+        /* 容器和版面 */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.125rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* 主要網格布局 */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        @media (min-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+
+        /* 卡片樣式 */
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* 相機預覽區域 - 重要：背景設為中性色以便看到畫框 */
+        .preview-container {
+            aspect-ratio: 1/1;
+            background: #2d3748; /* 深灰色背景，讓畫框更明顯 */
+            border-radius: 0.75rem;
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+        }
+
+        .media-element {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: cover;
+        }
+
+        /* 畫框疊加層 - PNG透明支援 */
+        .frame-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            object-fit: contain; /* 改為contain以保持畫框比例 */
+        }
+
+        /* 初始提示區 */
+        .placeholder-content {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            background: #111827;
+        }
+
+        .camera-icon {
+            width: 6rem;
+            height: 6rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.5;
+        }
+
+        /* 按鈕樣式 */
+        .btn {
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            border-radius: 9999px;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            text-decoration: none;
+            outline: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            color: white;
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        /* 畫框選擇網格 - 針對PNG優化 */
+        .frame-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .frame-item {
+            position: relative;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 3px solid transparent;
+            background: #f3f4f6; /* 淺灰背景以顯示PNG透明區域 */
+            padding: 0.25rem;
+        }
+
+        .frame-item:hover {
+            transform: scale(1.05);
+            border-color: #fbbf24;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .frame-item.active {
+            border-color: #f59e0b;
+            box-shadow: 0 10px 30px rgba(245, 158, 11, 0.4);
+            background: #fef3c7;
+        }
+
+        .frame-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* 改為contain以顯示完整畫框 */
+            aspect-ratio: 1/1;
+        }
+
+        .frame-label {
+            position: absolute;
+            bottom: 0.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .frame-item:hover .frame-label {
+            opacity: 1;
+        }
+
+        /* 訊息提示 */
+        .message {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .message.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .message.warning {
+            background: #fed7aa;
+            color: #92400e;
+            border: 1px solid #fdba74;
+        }
+
+        /* 提示框 */
+        .tip-box {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            border-radius: 0.5rem;
+        }
+
+        .tip-box strong {
+            color: #92400e;
+        }
+
+        .tip-box p {
+            color: #78350f;
+            font-size: 0.875rem;
+            margin: 0;
+        }
+
+        /* PNG格式提示 */
+        .format-notice {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #e0e7ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            color: #3730a3;
+        }
+
+        /* 載入動畫 */
+        .loader {
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #8b5cf6;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        .loading-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #111827;
+            color: white;
+        }
+
+        /* 倒數計時 */
+        .countdown-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 20;
+        }
+
+        .countdown-number {
+            font-size: 5rem;
+            color: white;
+            font-weight: bold;
+            animation: pulse 1s ease-in-out;
+        }
+
+        /* 閃光效果 */
+        .flash-effect {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 9999;
+            pointer-events: none;
+            animation: flashAnimation 0.5s ease-out;
+        }
+
+        /* 頁腳 */
+        .footer {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            padding: 2rem 0;
+            font-size: 0.875rem;
+        }
+
+        /* 隱藏元素 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 動畫 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        @keyframes flashAnimation {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* 響應式調整 */
+        @media (max-width: 640px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .countdown-number {
+                font-size: 3rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .frame-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+        }
+
+        /* 圖標樣式 */
+        .icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 標題 -->
+        <header class="header">
+            <h1>🎨 文藝復興自拍機</h1>
+            <p>選擇典雅畫框，創造您的藝術傑作</p>
+        </header>
+
+        <!-- 主要內容 -->
+        <div class="main-grid">
+            <!-- 左側：預覽區 -->
+            <div class="card">
+                <h2 class="card-title">
+                    <span>📸</span>
+                    <span>即時預覽</span>
+                </h2>
+
+                <!-- 相機預覽 -->
+                <div class="preview-container">
+                    <!-- 初始提示 -->
+                    <div id="placeholder" class="placeholder-content">
+                        <svg class="camera-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <p style="font-size: 1.125rem; margin-bottom: 1rem;">準備好創作您的藝術作品了嗎？</p>
+                        <button onclick="initCamera()" class="btn btn-primary">啟動相機</button>
+                    </div>
+
+                    <!-- 載入中 -->
+                    <div id="loading" class="loading-container hidden">
+                        <div class="loader"></div>
+                        <p>正在啟動相機...</p>
+                    </div>
+
+                    <!-- 倒數計時 -->
+                    <div id="countdown" class="countdown-container hidden">
+                        <span class="countdown-number"></span>
+                    </div>
+
+                    <!-- 視訊 -->
+                    <video id="camera" class="media-element hidden" autoplay playsinline muted></video>
+                    
+                    <!-- 畫框疊加 -->
+                    <img id="frameLayer" class="frame-overlay hidden" alt="Frame">
+                    
+                    <!-- 最終照片 -->
+                    <img id="finalPhoto" class="media-element hidden" alt="Your Photo">
+                </div>
+
+                <!-- 隱藏的 Canvas -->
+                <canvas id="canvas" class="hidden"></canvas>
+
+                <!-- 控制按鈕 -->
+                <div class="btn-group">
+                    <button id="captureBtn" onclick="capturePhoto()" disabled class="btn btn-primary">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <circle cx="12" cy="13" r="3" stroke-width="2"></circle>
+                        </svg>
+                        拍照 (3秒倒數)
+                    </button>
+                    
+                    <button id="downloadBtn" onclick="downloadPhoto()" class="btn btn-success hidden">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        下載作品
+                    </button>
+                    
+                    <button id="retakeBtn" onclick="retakePhoto()" class="btn btn-secondary hidden">
+                        重新拍攝
+                    </button>
+
+                    <button id="switchBtn" onclick="switchCamera()" class="btn btn-info hidden">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        切換鏡頭
+                    </button>
+                </div>
+
+                <!-- 訊息顯示 -->
+                <div id="message"></div>
+            </div>
+
+            <!-- 右側：畫框選擇 -->
+            <div class="card">
+                <h2 class="card-title">
+                    <span>🖼️</span>
+                    <span>選擇畫框</span>
+                </h2>
+
+                <div id="frameGrid" class="frame-grid">
+                    <!-- 畫框將由 JavaScript 動態生成 -->
+                </div>
+
+                <div class="tip-box">
+                    <p><strong>提示：</strong>選擇您喜歡的文藝復興風格畫框，讓照片更具藝術感！</p>
+                </div>
+
+                <div class="format-notice">
+                    <p>📌 <strong>注意：</strong>請確保畫框圖片為 PNG 格式，中央需有透明區域以顯示照片。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 頁腳 -->
+        <footer class="footer">
+            <p>&copy; 2025 Renaissance Photo Booth - 創造您的藝術時刻</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // 配置 - 改為PNG格式
+        const CONFIG = {
+            frames: [
+                'Renaissance01.png',  // 改為 PNG
+                'Renaissance02.png',
+                'Renaissance03.png',
+                'Renaissance04.png',
+                'Renaissance05.png',
+                'Renaissance06.png'
+            ],
+            countdownSeconds: 3,
+            photoQuality: 0.95,
+            outputFormat: 'image/png'  // 輸出也改為PNG以保持最佳品質
+        };
+
+        // 應用程式狀態
+        const state = {
+            stream: null,
+            selectedFrame: null,
+            currentFacingMode: 'user',
+            photoDataUrl: null,
+            hasMultipleCameras: false
+        };
+
+        // DOM 元素緩存
+        const elements = {
+            placeholder: document.getElementById('placeholder'),
+            loading: document.getElementById('loading'),
+            countdown: document.getElementById('countdown'),
+            camera: document.getElementById('camera'),
+            frameLayer: document.getElementById('frameLayer'),
+            finalPhoto: document.getElementById('finalPhoto'),
+            canvas: document.getElementById('canvas'),
+            captureBtn: document.getElementById('captureBtn'),
+            downloadBtn: document.getElementById('downloadBtn'),
+            retakeBtn: document.getElementById('retakeBtn'),
+            switchBtn: document.getElementById('switchBtn'),
+            frameGrid: document.getElementById('frameGrid'),
+            message: document.getElementById('message')
+        };
+
+        // 初始化畫框選擇器
+        function initFrameSelector() {
+            elements.frameGrid.innerHTML = '';
+            
+            CONFIG.frames.forEach((frameName, index) => {
+                const frameItem = document.createElement('div');
+                frameItem.className = 'frame-item';
+                frameItem.onclick = () => selectFrame(frameName, frameItem);
+                
+                const img = document.createElement('img');
+                img.src = frameName;
+                img.alt = `畫框 ${index + 1}`;
+                
+                // PNG載入錯誤處理
+                img.onerror = () => {
+                    // 創建一個錯誤提示圖片
+                    img.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='45%25' text-anchor='middle' dy='.3em' fill='%23ef4444' font-size='14'%3EPNG%3C/text%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' dy='.3em' fill='%23ef4444' font-size='14'%3E載入失敗%3C/text%3E%3C/svg%3E`;
+                    showMessage(`畫框 ${frameName} 載入失敗，請檢查PNG檔案`, 'error');
+                };
+                
+                const label = document.createElement('div');
+                label.className = 'frame-label';
+                label.textContent = `畫框 ${index + 1}`;
+                
+                frameItem.appendChild(img);
+                frameItem.appendChild(label);
+                elements.frameGrid.appendChild(frameItem);
+            });
+
+            // 預設選擇第一個
+            const firstFrame = elements.frameGrid.querySelector('.frame-item');
+            if (firstFrame) {
+                selectFrame(CONFIG.frames[0], firstFrame);
+            }
+        }
+
+        // 選擇畫框
+        function selectFrame(frameName, element) {
+            // 更新狀態
+            state.selectedFrame = frameName;
+            
+            // 更新UI
+            document.querySelectorAll('.frame-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            element.classList.add('active');
+            
+            // 更新疊加層
+            elements.frameLayer.src = frameName;
+            elements.frameLayer.onerror = () => {
+                showMessage('畫框載入失敗，請確認是否為PNG格式且有透明區域', 'error');
+            };
+            
+            // 顯示訊息
+            showMessage(`已選擇：${frameName.replace('.png', '')}`, 'success');
+            
+            // 啟用拍照按鈕
+            if (state.stream) {
+                elements.captureBtn.disabled = false;
+            }
+        }
+
+        // 顯示訊息
+        function showMessage(text, type = 'info') {
+            const messageDiv = elements.message;
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            
+            // 3秒後自動清除
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 3000);
+        }
+
+        // 初始化相機
+        async function initCamera() {
+            try {
+                // 顯示載入中
+                elements.placeholder.classList.add('hidden');
+                elements.loading.classList.remove('hidden');
+                
+                // 相機配置
+                const constraints = {
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 1280 },
+                        facingMode: state.currentFacingMode
+                    }
+                };
+                
+                // 請求相機權限
+                state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // 設置視訊源
+                elements.camera.srcObject = state.stream;
+                
+                // 等待載入完成
+                elements.camera.onloadedmetadata = async () => {
+                    elements.loading.classList.add('hidden');
+                    elements.camera.classList.remove('hidden');
+                    elements.frameLayer.classList.remove('hidden');
+                    
+                    // 啟用拍照按鈕
+                    if (state.selectedFrame) {
+                        elements.captureBtn.disabled = false;
+                    }
+                    
+                    // 檢查多鏡頭
+                    try {
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                        if (videoInputs.length > 1) {
+                            state.hasMultipleCameras = true;
+                            elements.switchBtn.classList.remove('hidden');
+                        }
+                    } catch (err) {
+                        console.log('無法枚舉設備:', err);
+                    }
+                    
+                    showMessage('相機已就緒！', 'success');
+                };
+                
+            } catch (error) {
+                console.error('相機錯誤:', error);
+                elements.loading.classList.add('hidden');
+                elements.placeholder.classList.remove('hidden');
+                
+                let errorMsg = '無法啟動相機';
+                if (error.name === 'NotAllowedError') {
+                    errorMsg = '請允許使用相機權限';
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg = '未檢測到相機設備';
+                }
+                
+                showMessage(errorMsg, 'error');
+            }
+        }
+
+        // 切換相機
+        async function switchCamera() {
+            if (state.stream) {
+                // 停止當前流
+                state.stream.getTracks().forEach(track => track.stop());
+                
+                // 切換方向
+                state.currentFacingMode = state.currentFacingMode === 'user' ? 'environment' : 'user';
+                
+                // 重新初始化
+                await initCamera();
+            }
+        }
+
+        // 拍照倒數計時
+        async function capturePhoto() {
+            if (!state.stream || !state.selectedFrame) return;
+            
+            elements.captureBtn.disabled = true;
+            elements.countdown.classList.remove('hidden');
+            
+            const countdownNumber = elements.countdown.querySelector('.countdown-number');
+            
+            // 倒數計時
+            for (let i = CONFIG.countdownSeconds; i > 0; i--) {
+                countdownNumber.textContent = i;
+                countdownNumber.style.animation = 'none';
+                setTimeout(() => {
+                    countdownNumber.style.animation = 'pulse 1s ease-in-out';
+                }, 10);
+                
+                if (i > 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            elements.countdown.classList.add('hidden');
+            
+            // 閃光效果
+            const flash = document.createElement('div');
+            flash.className = 'flash-effect';
+            document.body.appendChild(flash);
+            setTimeout(() => flash.remove(), 500);
+            
+            // 執行拍照
+            await takePhoto();
+        }
+
+        // 實際拍照 - 優化PNG合成
+        async function takePhoto() {
+            const video = elements.camera;
+            const canvas = elements.canvas;
+            const ctx = canvas.getContext('2d');
+            
+            // 計算正方形裁切
+            const size = Math.min(video.videoWidth, video.videoHeight);
+            const offsetX = (video.videoWidth - size) / 2;
+            const offsetY = (video.videoHeight - size) / 2;
+            
+            canvas.width = size;
+            canvas.height = size;
+            
+            // 清空畫布（重要：確保透明背景）
+            ctx.clearRect(0, 0, size, size);
+            
+            // 1. 先繪製視訊（底層）
+            ctx.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size);
+            
+            // 2. 載入並繪製PNG畫框（上層）
+            const frameImg = new Image();
+            
+            frameImg.onload = () => {
+                // 設定合成模式，確保PNG透明部分正確顯示
+                ctx.globalCompositeOperation = 'source-over';
+                
+                // 繪製PNG畫框（保持透明區域）
+                ctx.drawImage(frameImg, 0, 0, size, size);
+                
+                // 生成最終圖片（PNG格式以保持透明度）
+                state.photoDataUrl = canvas.toDataURL(CONFIG.outputFormat, CONFIG.photoQuality);
+                elements.finalPhoto.src = state.photoDataUrl;
+                
+                // 切換顯示
+                elements.camera.classList.add('hidden');
+                elements.frameLayer.classList.add('hidden');
+                elements.finalPhoto.classList.remove('hidden');
+                
+                // 更新按鈕
+                elements.captureBtn.classList.add('hidden');
+                elements.switchBtn.classList.add('hidden');
+                elements.downloadBtn.classList.remove('hidden');
+                elements.retakeBtn.classList.remove('hidden');
+                
+                // 停止相機
+                if (state.stream) {
+                    state.stream.getTracks().forEach(track => track.stop());
+                    state.stream = null;
+                }
+                
+                showMessage('照片完成！可以下載或重拍', 'success');
+            };
+            
+            frameImg.onerror = () => {
+                showMessage('PNG畫框載入失敗，請檢查檔案格式', 'error');
+                elements.captureBtn.disabled = false;
+            };
+            
+            // 載入PNG畫框
+            frameImg.src = state.selectedFrame;
+        }
+
+        // 下載照片 - 輸出PNG格式
+        function downloadPhoto() {
+            if (!state.photoDataUrl) return;
+            
+            const link = document.createElement('a');
+            link.href = state.photoDataUrl;
+            link.download = `Renaissance_${Date.now()}.png`; // 改為PNG
+            link.click();
+            
+            showMessage('照片已下載（PNG格式）！', 'success');
+        }
+
+        // 重新拍攝
+        function retakePhoto() {
+            elements.finalPhoto.classList.add('hidden');
+            elements.placeholder.classList.remove('hidden');
+            elements.captureBtn.classList.remove('hidden');
+            elements.downloadBtn.classList.add('hidden');
+            elements.retakeBtn.classList.add('hidden');
+            
+            state.photoDataUrl = null;
+            showMessage('請重新啟動相機', 'info');
+        }
+
+        // 頁面載入初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            initFrameSelector();
+            
+            // 檢查瀏覽器支援
+            if (!navigator.mediaDevices?.getUserMedia) {
+                showMessage('瀏覽器不支援相機功能', 'error');
+                elements.captureBtn.disabled = true;
+            }
+            
+            // 顯示PNG格式提醒
+            console.log('提醒：請確保畫框檔案為PNG格式，並且中央有透明區域');
+        });
+
+        // 清理資源
+        window.addEventListener('beforeunload', () => {
+            if (state.stream) {
+                state.stream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
