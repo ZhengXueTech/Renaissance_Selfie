@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>文藝復興自拍機 Pro | 進階畫框相機</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 基礎樣式 */
+        .square-container {
+            width: 100%;
+            padding-bottom: 100%;
+            position: relative;
+            background: #000;
+        }
+
+        .square-container > * {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 0.75rem;
+        }
+        
+        /* 即時預覽的畫框疊加 */
+        #frameOverlay {
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0.9;
+        }
+        
+        /* 載入動畫 */
+        .spinner {
+            border-top-color: #3b82f6;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 鏡頭切換按鈕 */
+        .camera-switch-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .camera-switch-btn:hover {
+            background: rgba(0, 0, 0, 0.7);
+            transform: scale(1.1);
+        }
+        
+        /* 拖放區域 */
+        .drop-zone {
+            border: 3px dashed #CBD5E1;
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone.dragover {
+            border-color: #3B82F6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        /* 構圖輔助線 */
+        .guide-line {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .guide-line.horizontal {
+            width: 100%;
+            height: 1px;
+        }
+        
+        .guide-line.vertical {
+            width: 1px;
+            height: 100%;
+        }
+        
+        /* 調整控制面板 */
+        .adjustment-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        /* 裁切模式按鈕 */
+        .crop-mode-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+        
+        .crop-mode-btn.active {
+            background: #3B82F6;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans flex flex-col items-center p-4">
+
+    <header class="w-full max-w-5xl mb-6 text-center">
+        <h1 class="text-4xl font-extrabold text-indigo-700 mt-4 mb-2">
+            🎨 文藝復興自拍機 Pro
+        </h1>
+        <p class="text-gray-600">即時預覽、上傳照片、鏡頭切換、智慧調整</p>
+    </header>
+
+    <main class="w-full max-w-5xl flex flex-col lg:flex-row gap-6">
+
+        <!-- 左側：主要操作區 -->
+        <section class="lg:w-2/3 w-full">
+            
+            <!-- 模式選擇 -->
+            <div id="modeSelection" class="bg-white p-6 rounded-xl shadow-2xl border border-gray-100 mb-4">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">選擇模式</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button onclick="app.startCameraMode()" class="flex flex-col items-center p-6 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg transition-all">
+                        <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 5h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 8H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <span class="text-lg font-bold">即時拍照</span>
+                        <span class="text-sm mt-1 opacity-90">使用相機拍攝</span>
+                    </button>
+                    
+                    <button onclick="document.getElementById('fileInput').click()" class="flex flex-col items-center p-6 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-xl hover:shadow-lg transition-all">
+                        <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-lg font-bold">選擇照片</span>
+                        <span class="text-sm mt-1 opacity-90">從相簿上傳</span>
+                    </button>
+                </div>
+                
+                <!-- 拖放區域 -->
+                <div id="dropZone" class="drop-zone mt-4 p-8 text-center rounded-xl">
+                    <p class="text-gray-500">或將照片拖放到這裡</p>
+                    <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="app.handleFileSelect(event)">
+                </div>
+            </div>
+
+            <!-- 預覽區 -->
+            <div id="previewSection" class="bg-white p-4 rounded-xl shadow-2xl border border-gray-100 hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-xl font-semibold text-gray-700">即時預覽</h2>
+                    <button onclick="app.toggleGuides()" class="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full">
+                        <span id="guidesToggle">顯示輔助線</span>
+                    </button>
+                </div>
+                
+                <div id="previewArea" class="square-container bg-black rounded-xl overflow-hidden relative">
+                    
+                    <!-- 相機視訊流 -->
+                    <video id="videoFeed" class="hidden" autoplay playsinline></video>
+                    
+                    <!-- 上傳的照片 -->
+                    <img id="uploadedPhoto" class="hidden" alt="Uploaded Photo">
+                    
+                    <!-- 畫框疊加層 -->
+                    <img id="frameOverlay" src="" alt="Frame Overlay" class="hidden object-contain">
+                    
+                    <!-- 鏡頭切換按鈕 -->
+                    <button id="cameraSwitchBtn" onclick="app.switchCamera()" class="camera-switch-btn hidden">
+                        <span id="cameraIcon" class="text-2xl">🔄</span>
+                    </button>
+                    
+                    <!-- 構圖輔助線 -->
+                    <div id="compositionGuides" class="hidden" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:15;">
+                        <div class="guide-line horizontal" style="top: 33.33%;"></div>
+                        <div class="guide-line horizontal" style="top: 66.66%;"></div>
+                        <div class="guide-line vertical" style="left: 33.33%;"></div>
+                        <div class="guide-line vertical" style="left: 66.66%;"></div>
+                    </div>
+                    
+                    <!-- 最終照片 -->
+                    <img id="photoOutput" class="hidden" alt="Final Result">
+                    
+                    <!-- 狀態訊息 -->
+                    <div id="statusMessage" class="text-white text-center p-6 w-full h-full flex flex-col items-center justify-center">
+                        <div class="spinner w-10 h-10 border-4 border-gray-200 border-solid rounded-full"></div>
+                        <p class="mt-2 text-lg">載入中...</p>
+                    </div>
+                </div>
+
+                <!-- 調整控制 -->
+                <div id="adjustmentPanel" class="adjustment-panel hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-medium text-gray-700">照片調整</span>
+                        <button onclick="app.resetAdjustments()" class="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">重設</button>
+                    </div>
+                    
+                    <!-- 裁切模式 -->
+                    <div id="cropModes" class="hidden mb-3">
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="app.setCropMode('center')" data-mode="center" class="crop-mode-btn flex-1 bg-gray-100 active">中心</button>
+                            <button onclick="app.setCropMode('cover')" data-mode="cover" class="crop-mode-btn flex-1 bg-gray-100">填滿</button>
+                            <button onclick="app.setCropMode('contain')" data-mode="contain" class="crop-mode-btn flex-1 bg-gray-100">完整</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 縮放控制 -->
+                    <div class="mb-3">
+                        <label class="text-xs text-gray-600">縮放: <span id="scaleValue">100%</span></label>
+                        <input type="range" id="scaleSlider" min="80" max="120" value="100" class="w-full" oninput="app.updateScale(this.value)">
+                    </div>
+                </div>
+
+                <!-- Canvas -->
+                <canvas id="photoCanvas" class="hidden"></canvas>
+                
+                <!-- 動作按鈕 -->
+                <div id="actionButtons" class="flex justify-center gap-3 mt-4">
+                    <button id="captureButton" onclick="app.capturePhoto()" disabled class="flex items-center px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-full disabled:opacity-50">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 5h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 8H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                        </svg>
+                        拍攝照片
+                    </button>
+                    
+                    <button id="applyFrameButton" onclick="app.applyFrame()" class="hidden flex items-center px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        套用畫框
+                    </button>
+                    
+                    <button id="downloadButton" onclick="app.downloadImage()" class="hidden flex items-center px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-full">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        下載作品
+                    </button>
+                    
+                    <button onclick="app.resetCapture()" class="hidden" id="retakeButton">
+                        <span class="px-6 py-3 bg-gray-400 hover:bg-gray-500 text-white font-bold rounded-full block">重新開始</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右側：畫框選擇 -->
+        <section class="lg:w-1/3 w-full bg-white p-4 rounded-xl shadow-2xl border border-gray-100">
+            <h2 class="text-xl font-semibold mb-3 text-gray-700">選擇畫框</h2>
+            <div id="frameSelector" class="grid grid-cols-3 gap-3"></div>
+            <p id="frameStatus" class="mt-4 text-sm text-center text-gray-500">請先選擇模式</p>
+        </section>
+
+    </main>
+
+    <footer class="mt-10 text-gray-500 text-sm text-center">
+        <p>&copy; 2025 Renaissance Photo Booth Pro</p>
+    </footer>
+
+    <script>
+        // 應用程式主物件
+        const app = {
+            // 狀態變數
+            FRAME_PATHS: [
+                'Renaissance01.png',
+                'Renaissance02.png',
+                'Renaissance03.png',
+                'Renaissance04.png',
+                'Renaissance05.png',
+                'Renaissance06.png'
+            ],
+            currentMode: null,
+            currentFramePath: null,
+            stream: null,
+            currentCamera: 'user',
+            uploadedImage: null,
+            guidesVisible: false,
+            finalImageURL: null,
+            adjustments: {
+                scale: 100,
+                offsetX: 0,
+                offsetY: 0,
+                cropMode: 'center',
+                focalPoint: { x: 0.5, y: 0.5 }
+            },
+
+            // 初始化
+            init() {
+                console.log('初始化應用程式...');
+                this.renderFrameSelector();
+                this.setupDragAndDrop();
+                
+                // 選擇第一個畫框作為預設
+                const firstFrame = document.querySelector('#frameSelector img');
+                if (firstFrame) {
+                    this.selectFrame(this.FRAME_PATHS[0], firstFrame);
+                }
+            },
+
+            // 渲染畫框選擇器
+            renderFrameSelector() {
+                const selector = document.getElementById('frameSelector');
+                selector.innerHTML = '';
+                
+                this.FRAME_PATHS.forEach((path, index) => {
+                    const img = document.createElement('img');
+                    img.src = path;
+                    img.alt = `Frame ${index + 1}`;
+                    img.className = 'w-full h-auto rounded-lg cursor-pointer transition transform hover:scale-105 shadow-md border-4 border-transparent';
+                    img.dataset.path = path;
+                    img.onclick = () => this.selectFrame(path, img);
+                    
+                    img.onerror = () => {
+                        console.error(`無法載入畫框: ${path}`);
+                        img.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23ccc'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='%23666'%3EFrame ${index+1}%3C/text%3E%3C/svg%3E`;
+                    };
+                    
+                    selector.appendChild(img);
+                });
+            },
+
+            // 選擇畫框
+            selectFrame(path, element) {
+                console.log('選擇畫框:', path);
+                this.currentFramePath = path;
+                
+                const frameOverlay = document.getElementById('frameOverlay');
+                frameOverlay.src = path;
+                
+                frameOverlay.onload = () => {
+                    frameOverlay.classList.remove('hidden');
+                    if (this.currentMode) {
+                        document.getElementById('captureButton').disabled = false;
+                        document.getElementById('applyFrameButton').disabled = false;
+                    }
+                };
+                
+                // 更新選中樣式
+                document.querySelectorAll('#frameSelector img').forEach(img => {
+                    img.classList.remove('border-indigo-500');
+                    img.classList.add('border-transparent');
+                });
+                element.classList.add('border-indigo-500');
+                
+                this.showMessage(`已選擇畫框：Frame ${this.FRAME_PATHS.indexOf(path) + 1}`);
+            },
+
+            // 開始相機模式
+            async startCameraMode() {
+                console.log('開始相機模式');
+                this.currentMode = 'camera';
+                document.getElementById('modeSelection').classList.add('hidden');
+                document.getElementById('previewSection').classList.remove('hidden');
+                document.getElementById('cameraSwitchBtn').classList.remove('hidden');
+                document.getElementById('adjustmentPanel').classList.remove('hidden');
+                document.getElementById('cropModes').classList.add('hidden');
+                document.getElementById('captureButton').classList.remove('hidden');
+                document.getElementById('applyFrameButton').classList.add('hidden');
+                
+                await this.startCamera();
+            },
+
+            // 啟動相機
+            async startCamera(camera = 'user') {
+                try {
+                    console.log('啟動相機:', camera);
+                    document.getElementById('statusMessage').classList.remove('hidden');
+                    
+                    if (this.stream) {
+                        this.stream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    const constraints = {
+                        video: { facingMode: camera }
+                    };
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    const video = document.getElementById('videoFeed');
+                    video.srcObject = this.stream;
+                    
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        document.getElementById('statusMessage').classList.add('hidden');
+                        video.classList.remove('hidden');
+                        document.getElementById('frameOverlay').classList.remove('hidden');
+                        
+                        if (this.currentFramePath) {
+                            document.getElementById('captureButton').disabled = false;
+                        }
+                        
+                        this.showMessage('相機已啟動');
+                    };
+                    
+                    this.currentCamera = camera;
+                    this.updateCameraIcon();
+                    
+                } catch (err) {
+                    console.error('相機啟動失敗:', err);
+                    this.showMessage('無法啟動相機，請檢查權限', 'error');
+                }
+            },
+
+            // 切換相機
+            async switchCamera() {
+                const newCamera = this.currentCamera === 'user' ? 'environment' : 'user';
+                await this.startCamera(newCamera);
+            },
+
+            // 更新相機圖示
+            updateCameraIcon() {
+                const icon = document.getElementById('cameraIcon');
+                icon.textContent = this.currentCamera === 'user' ? '📱' : '📷';
+            },
+
+            // 處理檔案選擇
+            handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (file && file.type.match('image.*')) {
+                    this.handleFile(file);
+                }
+            },
+
+            // 處理檔案
+            handleFile(file) {
+                console.log('處理檔案:', file.name);
+                this.currentMode = 'upload';
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.uploadedImage = new Image();
+                    this.uploadedImage.onload = () => {
+                        this.displayUploadedImage();
+                    };
+                    this.uploadedImage.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            // 顯示上傳的圖片
+            displayUploadedImage() {
+                console.log('顯示上傳的圖片');
+                document.getElementById('modeSelection').classList.add('hidden');
+                document.getElementById('previewSection').classList.remove('hidden');
+                document.getElementById('uploadedPhoto').src = this.uploadedImage.src;
+                document.getElementById('uploadedPhoto').classList.remove('hidden');
+                document.getElementById('statusMessage').classList.add('hidden');
+                document.getElementById('frameOverlay').classList.remove('hidden');
+                document.getElementById('adjustmentPanel').classList.remove('hidden');
+                document.getElementById('cropModes').classList.remove('hidden');
+                document.getElementById('applyFrameButton').classList.remove('hidden');
+                document.getElementById('captureButton').classList.add('hidden');
+                
+                if (this.currentFramePath) {
+                    document.getElementById('applyFrameButton').disabled = false;
+                }
+                
+                this.showMessage('照片已載入，可以套用畫框');
+            },
+
+            // 拍照
+            async capturePhoto() {
+                console.log('拍照中...');
+                const button = document.getElementById('captureButton');
+                if (!this.stream || button.disabled) return;
+                
+                button.disabled = true;
+                button.innerHTML = '處理中...';
+                
+                // 使用 setTimeout 確保 UI 更新
+                setTimeout(() => {
+                    this.processImage(document.getElementById('videoFeed'));
+                }, 100);
+            },
+
+            // 套用畫框
+            applyFrame() {
+                console.log('套用畫框...');
+                if (!this.uploadedImage) return;
+                
+                const button = document.getElementById('applyFrameButton');
+                button.disabled = true;
+                button.innerHTML = '處理中...';
+                
+                // 使用 setTimeout 確保 UI 更新
+                setTimeout(() => {
+                    this.processImage(document.getElementById('uploadedPhoto'));
+                }, 100);
+            },
+
+            // 處理圖片
+            processImage(source) {
+                console.log('開始處理圖片...');
+                
+                try {
+                    const canvas = document.getElementById('photoCanvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 設定畫布尺寸
+                    const size = 800;
+                    canvas.width = size;
+                    canvas.height = size;
+                    
+                    // 清空畫布
+                    ctx.clearRect(0, 0, size, size);
+                    
+                    // 繪製來源圖片
+                    if (source.tagName === 'VIDEO') {
+                        const vw = source.videoWidth;
+                        const vh = source.videoHeight;
+                        const min = Math.min(vw, vh);
+                        const sx = (vw - min) / 2;
+                        const sy = (vh - min) / 2;
+                        ctx.drawImage(source, sx, sy, min, min, 0, 0, size, size);
+                    } else {
+                        // 繪製上傳的照片（中心裁切）
+                        const iw = source.naturalWidth;
+                        const ih = source.naturalHeight;
+                        const min = Math.min(iw, ih);
+                        const sx = (iw - min) / 2;
+                        const sy = (ih - min) / 2;
+                        ctx.drawImage(source, sx, sy, min, min, 0, 0, size, size);
+                    }
+                    
+                    // 載入並繪製畫框
+                    const frameImage = new Image();
+                    
+                    frameImage.onerror = () => {
+                        console.error('畫框載入失敗');
+                        this.showMessage('畫框載入失敗', 'error');
+                        this.resetButtons();
+                    };
+                    
+                    frameImage.onload = () => {
+                        console.log('畫框載入成功，繪製中...');
+                        
+                        try {
+                            // 繪製畫框
+                            ctx.drawImage(frameImage, 0, 0, size, size);
+                            
+                            // 生成最終圖片
+                            this.finalImageURL = canvas.toDataURL('image/png');
+                            
+                            // 顯示結果
+                            const output = document.getElementById('photoOutput');
+                            output.src = this.finalImageURL;
+                            output.classList.remove('hidden');
+                            
+                            // 隱藏其他元素
+                            document.getElementById('videoFeed').classList.add('hidden');
+                            document.getElementById('uploadedPhoto').classList.add('hidden');
+                            document.getElementById('frameOverlay').classList.add('hidden');
+                            document.getElementById('adjustmentPanel').classList.add('hidden');
+                            document.getElementById('cameraSwitchBtn').classList.add('hidden');
+                            
+                            // 更新按鈕
+                            document.getElementById('captureButton').classList.add('hidden');
+                            document.getElementById('applyFrameButton').classList.add('hidden');
+                            document.getElementById('downloadButton').classList.remove('hidden');
+                            document.getElementById('downloadButton').style.display = 'flex';
+                            document.getElementById('retakeButton').classList.remove('hidden');
+                            
+                            // 停止相機
+                            if (this.stream) {
+                                this.stream.getTracks().forEach(track => track.stop());
+                                this.stream = null;
+                            }
+                            
+                            this.showMessage('作品完成！');
+                            this.resetButtons();
+                            
+                        } catch (err) {
+                            console.error('處理失敗:', err);
+                            this.showMessage('處理失敗', 'error');
+                            this.resetButtons();
+                        }
+                    };
+                    
+                    // 開始載入畫框
+                    frameImage.src = this.currentFramePath;
+                    
+                } catch (err) {
+                    console.error('處理圖片錯誤:', err);
+                    this.showMessage('處理失敗', 'error');
+                    this.resetButtons();
+                }
+            },
+
+            // 下載圖片
+            downloadImage() {
+                if (!this.finalImageURL) return;
+                
+                const a = document.createElement('a');
+                a.href = this.finalImageURL;
+                a.download = `Renaissance_${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                this.showMessage('下載已開始');
+            },
+
+            // 重設按鈕
+            resetButtons() {
+                const captureBtn = document.getElementById('captureButton');
+                const applyBtn = document.getElementById('applyFrameButton');
+                
+                captureBtn.disabled = false;
+                captureBtn.innerHTML = '<svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 5h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 8H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>拍攝照片';
+                
+                applyBtn.disabled = false;
+                applyBtn.innerHTML = '<svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>套用畫框';
+            },
+
+            // 重新開始
+            resetCapture() {
+                location.reload();
+            },
+
+            // 顯示訊息
+            showMessage(msg, type = 'info') {
+                const status = document.getElementById('frameStatus');
+                status.textContent = msg;
+                status.className = `mt-4 text-sm text-center font-semibold text-${type === 'error' ? 'red' : 'blue'}-500`;
+            },
+
+            // 設定拖放
+            setupDragAndDrop() {
+                const dropZone = document.getElementById('dropZone');
+                
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('dragover');
+                });
+                
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('dragover');
+                });
+                
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                    
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.match('image.*')) {
+                        this.handleFile(file);
+                    }
+                });
+            },
+
+            // 切換輔助線
+            toggleGuides() {
+                this.guidesVisible = !this.guidesVisible;
+                const guides = document.getElementById('compositionGuides');
+                const toggle = document.getElementById('guidesToggle');
+                
+                if (this.guidesVisible) {
+                    guides.classList.remove('hidden');
+                    toggle.textContent = '隱藏輔助線';
+                } else {
+                    guides.classList.add('hidden');
+                    toggle.textContent = '顯示輔助線';
+                }
+            },
+
+            // 設定裁切模式
+            setCropMode(mode) {
+                this.adjustments.cropMode = mode;
+                
+                document.querySelectorAll('.crop-mode-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+            },
+
+            // 更新縮放
+            updateScale(value) {
+                this.adjustments.scale = value;
+                document.getElementById('scaleValue').textContent = value + '%';
+            },
+
+            // 重設調整
+            resetAdjustments() {
+                this.adjustments = {
+                    scale: 100,
+                    offsetX: 0,
+                    offsetY: 0,
+                    cropMode: 'center',
+                    focalPoint: { x: 0.5, y: 0.5 }
+                };
+                
+                document.getElementById('scaleSlider').value = 100;
+                document.getElementById('scaleValue').textContent = '100%';
+                
+                this.showMessage('調整已重設');
+            }
+        };
+
+        // 初始化應用程式
+        window.onload = () => {
+            app.init();
+        };
+    </script>
+</body>
+</html>
